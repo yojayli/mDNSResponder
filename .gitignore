@@ -1,0 +1,8 @@
+bin
+gen
+.settings
+.project
+.classpath
+*.o
+*.o.d
+*.so
