@@ -11,7 +11,7 @@ import com.apple.dnssd.DNSSD;
 import com.apple.dnssd.DNSSDException;
 import com.apple.dnssd.DNSSDRegistration;
 import com.apple.dnssd.DNSSDService;
-import com.apple.dnssd.EmbededMDNS;
+import com.apple.dnssd.DNSSDEmbedded;
 import com.apple.dnssd.QueryListener;
 import com.apple.dnssd.RegisterListener;
 import com.apple.dnssd.ResolveListener;
@@ -54,13 +54,26 @@ public class MainActivity extends Activity {
 	protected void onResume() {
 		super.onResume();
 		acquireLock();
+		DNSSDEmbedded.listeners.clear();
+		DNSSDEmbedded.init(new DNSSDEmbedded.Listener() {
 
-		// Log.d(TAG, "getNameForIfIndex "+DNSSD.getNameForIfIndex(2));
-		new Thread() {
-			public void run() {
+			@Override
+			public void onStart() {
+				Log.d(TAG, "EmbededMDNS onStart");
 				ready();
 			}
-		}.start();
+
+			@Override
+			public void onEnd() {
+				Log.d(TAG, "EmbededMDNS onEnd");
+				DNSSDEmbedded.listeners.clear();
+			}
+
+			@Override
+			public void onError() {
+				Log.d(TAG, "EmbededMDNS onError");
+			}
+		});
 	}
 
 	@Override
@@ -72,8 +85,7 @@ public class MainActivity extends Activity {
 		if (mRegister != null) {
 			mRegister.stop();
 		}
-
-		EmbededMDNS.exit();
+		DNSSDEmbedded.exit();
 		releaseLock();
 		finish();
 	}
@@ -103,10 +115,9 @@ public class MainActivity extends Activity {
 	}
 
 	protected void ready() {
-		EmbededMDNS.init();
-		mBrowse = new Browse("_airdrop._tcp");
-		// new Browse("_afpovertcp._tcp");
-		// mRegister = new Register();
+		// mBrowse = new Browse("_airdrop._tcp");
+		mBrowse = new Browse("_test._tcp");
+		mRegister = new Register();
 	}
 
 	class Browse implements BrowseListener {
@@ -240,17 +251,7 @@ public class MainActivity extends Activity {
 			this.hostName = hostName;
 			this.port = port;
 			this.txtRecord = txtRecord;
-
 			new Query(this);
-
-			// try {
-			// InetAddress address = getInetAddress(hostName);
-			// doResolved(address, this);
-			// } catch (Exception e) {
-			// e.printStackTrace();
-			// new Query(this);
-			//
-			// }
 		}
 
 		public void doResolved(InetAddress address, Resolve resolve) {
@@ -270,8 +271,6 @@ public class MainActivity extends Activity {
 		Resolve mResolve;
 		DNSSDService mDNSSDService;
 
-		// Thread timeoutThread;
-
 		public Query(Resolve resolve) {
 			mResolve = resolve;
 			operate();
@@ -281,20 +280,6 @@ public class MainActivity extends Activity {
 			try {
 				mDNSSDService = DNSSD.queryRecord(0, mResolve.ifIndex,
 						mResolve.hostName, 1, 1, this);
-				// timeoutThread = new Thread() {
-				// public void run() {
-				// try {
-				// Thread.sleep(QUERY_TIMEOUT);
-				// } catch (InterruptedException e) {
-				// return;
-				// }
-				// mDNSSDService.stop();
-				// if (!mResolve.getBrowse().isRelease) {
-				// mResolve.getBrowse().operate();
-				// }
-				// }
-				// };
-				// timeoutThread.start();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -302,7 +287,6 @@ public class MainActivity extends Activity {
 
 		public void queryAnswered(DNSSDService query, int flags, int ifIndex,
 				String fullName, int rrtype, int rrclass, byte[] rdata, int ttl) {
-			// timeoutThread.interrupt();
 			String s = "Query result flags:" + String.valueOf(flags)
 					+ " ifIndex:" + String.valueOf(ifIndex) + " fullName:"
 					+ fullName + " rrtype:" + String.valueOf(rrtype)
