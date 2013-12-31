@@ -9,8 +9,11 @@ import java.util.Set;
 import com.apple.dnssd.BrowseListener;
 import com.apple.dnssd.DNSSD;
 import com.apple.dnssd.DNSSDException;
+import com.apple.dnssd.DNSSDRegistration;
 import com.apple.dnssd.DNSSDService;
+import com.apple.dnssd.EmbededMDNS;
 import com.apple.dnssd.QueryListener;
+import com.apple.dnssd.RegisterListener;
 import com.apple.dnssd.ResolveListener;
 import com.apple.dnssd.TXTRecord;
 
@@ -28,7 +31,7 @@ public class MainActivity extends Activity {
 	final static String TAG = MainActivity.class.getSimpleName();
 	Context mContext;
 	MulticastLock lock;
-
+	Register mRegister;
 	Browse mBrowse;
 	TextView mTextView;
 
@@ -63,6 +66,14 @@ public class MainActivity extends Activity {
 	@Override
 	protected void onPause() {
 		super.onPause();
+		if (mBrowse != null) {
+			mBrowse.release();
+		}
+		if (mRegister != null) {
+			mRegister.stop();
+		}
+
+		EmbededMDNS.exit();
 		releaseLock();
 		finish();
 	}
@@ -92,7 +103,10 @@ public class MainActivity extends Activity {
 	}
 
 	protected void ready() {
+		EmbededMDNS.init();
 		mBrowse = new Browse("_airdrop._tcp");
+		// new Browse("_afpovertcp._tcp");
+		// mRegister = new Register();
 	}
 
 	class Browse implements BrowseListener {
@@ -312,4 +326,42 @@ public class MainActivity extends Activity {
 			Log.d(TAG, "operationFailed " + service + "(" + errorCode + ")");
 		}
 	}
+
+	class Register implements RegisterListener {
+		protected DNSSDRegistration mDNSSDRegistration;
+
+		public Register() {
+			try {
+				TXTRecord r = new TXTRecord();
+				r.set("aa", "aaaa");
+				r.set("bb", "bbbb");
+				mDNSSDRegistration = DNSSD.register(0, 0, "Test service",
+						"_test._tcp", "", "", 12345, r, this);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		public void stop() {
+			if (mDNSSDRegistration != null) {
+				mDNSSDRegistration.stop();
+				mDNSSDRegistration = null;
+			}
+		}
+
+		public void serviceRegistered(DNSSDRegistration registration,
+				int flags, String serviceName, String regType, String domain) {
+			String s = "serviceRegistered flags:" + String.valueOf(flags)
+					+ " serviceName:" + serviceName + " regType:" + regType
+					+ " domain:" + domain;
+			append("");
+			append(s);
+		}
+
+		@Override
+		public void operationFailed(DNSSDService service, int errorCode) {
+			Log.d(TAG, "operationFailed " + service + "(" + errorCode + ")");
+		}
+	}
+
 }
